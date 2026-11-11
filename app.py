@@ -17,7 +17,7 @@ def toggle_language():
 ui = {
     "EN": {
         "title": "🦃 Holiday Roast & Timeline Calculator",
-        "subtitle": "Calculate your perfect turkey timeline and dessert prep down to the minute.",
+        "subtitle": "Calculate your perfect turkey timeline and prep down to the minute.",
         "btn_lang": "Auf Deutsch anzeigen 🇩🇪",
         "lbl_weight": "Turkey Weight (in kg)",
         "lbl_time": "Target Dining Time (24-hour format)",
@@ -27,7 +27,7 @@ ui = {
     },
     "DE": {
         "title": "🦃 Festtagsbraten & Zeitplan-Rechner",
-        "subtitle": "Berechnen Sie Ihren perfekten Puten-Zeitplan und die Dessert-Vorbereitung auf die Minute genau.",
+        "subtitle": "Berechnen Sie Ihren perfekten Puten-Zeitplan und Vorbereitung auf die Minute genau.",
         "btn_lang": "Switch to English 🇬🇧",
         "lbl_weight": "Gewicht der Pute/Truthahn (in kg)",
         "lbl_time": "Geplante Essenszeit (24-Stunden-Format)",
