@@ -111,7 +111,7 @@ if st.button(ui[current_lang]["btn_calc"], type="primary"):
                 
                 # Call Gemini 2.5 Flash for ultra-fast, structured processing
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-2-flash',
                     contents=f"Generate schedule for a {turkey_weight}kg turkey targeting a completion time of {formatted_time}.",
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
