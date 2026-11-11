@@ -1,5 +1,7 @@
-import streamlit as st
+import importlib
 import os
+import openai
+import streamlit as st
 from google import genai
 from google.genai import types
 
@@ -69,16 +71,21 @@ if st.button(ui[current_lang]["btn_calc"], type="primary"):
         st.error(ui[current_lang]["api_error"])
     else:
         with st.spinner(ui[current_lang]["loading"]):
+            response_text = ""
+            user_prompt = (
+                f"Generate schedule for a {turkey_weight}kg turkey targeting a completion time of {formatted_time}."
+            )
+
             try:
                 # Initialize the official Google GenAI Client
                 client = genai.Client(api_key=api_key)
-                
+
                 # Base System Prompt injected with the active output language instruction
                 system_instruction = f"""
                 You are an expert culinary assistant specialized in holiday roasting and baking logistics. Your sole purpose is to help users calculate precise, step-by-step preparation timelines and ingredient scaling for Holiday Turkeys and classic British desserts (like Sticky Toffee Pudding) adapted for local supermarkets (such as Germany).
 
                 OUTPUT LANGUAGE RULE:
-                You must write the entire output report completely in this language: {"English" if current_lang == "EN" else "German"}. 
+                You must write the entire output report completely in this language: {"English" if current_lang == "EN" else "German"}.
 
                 The user will provide two main inputs:
                 1. Turkey Weight (in kg)
@@ -99,7 +106,7 @@ if st.button(ui[current_lang]["btn_calc"], type="primary"):
                    - Target Internal Temp: Must reach 75°C (165°F) in the thickest part of the thigh.
                    - Resting Window: Mandate exactly 45 minutes of undisturbed rest post-roasting before carving.
                 4. Timeline Backward-Engineering:
-                   - Take the user's input "Target Dining Time" and subtract the exact sum of: Main Roast Time + 30 Mins (Initial Blast) + 45 Mins (Rest Time) + 30 Mins (Chilling Buffer/Prep). 
+                   - Take the user's input "Target Dining Time" and subtract the exact sum of: Main Roast Time + 30 Mins (Initial Blast) + 45 Mins (Rest Time) + 30 Mins (Chilling Buffer/Prep).
                    - Chart every milestone chronologically from the Friday evening brine setup to the moment of carving.
 
                 ### REGIONAL LOCALIZATION INSTRUCTIONS (GERMANY)
@@ -108,22 +115,69 @@ if st.button(ui[current_lang]["btn_calc"], type="primary"):
                 ### OUTPUT PRINT LAYOUT REQUIREMENT
                 Format your entire response using Markdown headers (###), bold text anchors for time-stamps (e.g., **09:15**), and clean, bordered tables for ingredient cross-references. Ensure there are distinct sections for the shopping list and chronology so it is clear when printed.
                 """
-                
-                # Call Gemini 2.5 Flash for ultra-fast, structured processing
-                response = client.models.generate_content(
-                    model=st.secrets.get("GEMINI_MODEL_NAME", "gemini-3.8-flash"),
-                    contents=f"Generate schedule for a {turkey_weight}kg turkey targeting a completion time of {formatted_time}.",
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.2
+
+                # --- TIER 1: Try Gemini Flash (Primary) ---
+                try:
+                    response = client.models.generate_content(
+                        model=st.secrets.get("GEMINI_MODEL_NAME", "gemini-3.8-flash"),
+                        contents=user_prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.2
+                        )
                     )
-                )
-                
-                # Render the resulting printable markdown directly inside the app container
-                st.markdown(response.text)
-                
-                # Built-in browser printing hint for the user
+                    response_text = response.text
+                    st.success("🤖 Powered by Gemini Flash")
+
+                except Exception as e:
+                    # If Gemini Flash hits a 503 error, don't crash! Trigger fallback.
+                    st.warning("⚠️ Gemini Flash is currently busy. Trying fallback model...")
+
+                    # --- TIER 2: Fallback to Gemini Pro ---
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-2.5-pro",
+                            contents=user_prompt,
+                            config=types.GenerateContentConfig(
+                                system_instruction=system_instruction,
+                                temperature=0.2
+                            )
+                        )
+                        response_text = response.text
+                        st.success("🚀 Powered by Gemini Pro (Fallback)")
+
+                    except Exception as pro_error:
+                        # --- TIER 3: Fallback to External Provider (OpenAI) ---
+                        openai_key = st.secrets.get("OPENAI_API_KEY", "")
+
+                        if openai_key:
+                            try:
+                                import openai
+
+                                st.warning("⚠️ Google AI is entirely overloaded. Routing to OpenAI...")
+                                openai_client = openai.OpenAI(api_key=openai_key)
+                                openai_response = openai_client.chat.completions.create(
+                                    model="gpt-4o-mini",
+                                    messages=[
+                                        {"role": "system", "content": system_instruction},
+                                        {"role": "user", "content": user_prompt}
+                                    ],
+                                    temperature=0.2
+                                )
+                                response_text = openai_response.choices[0].message.content
+                                st.success("🤖 Powered by OpenAI GPT-4o-mini (Emergency Fallback)")
+
+                            except Exception as oa_error:
+                                st.error(f"All model endpoints failed. OpenAI Error: {str(oa_error)}")
+                        else:
+                            st.error(
+                                "Gemini endpoints are down (503), and no secondary provider API key was configured. Please try again in a few moments."
+                            )
+
+            except Exception as init_error:
+                st.error(f"AI request failed: {str(init_error)}")
+
+            # If any model succeeded, render the text layout cleanly
+            if response_text:
+                st.markdown(response_text)
                 st.info("💡 Tip: Press Ctrl+P (Windows) or Cmd+P (Mac) to save this page layout cleanly as a PDF file!")
-                
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
